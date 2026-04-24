@@ -1,3 +1,4 @@
+import logging
 import re
 import subprocess
 import tempfile
@@ -20,6 +21,8 @@ from .constants import (
     RAIS_ESTABELECIMENTOS_COLUMNS,
     RAIS_VINCULOS_COLUMNS,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def parse_filename(f: Path) -> dict[str, str | int | None]:
@@ -70,7 +73,7 @@ def convert_columns_dtypes(df: pl.DataFrame) -> pl.DataFrame:
 def _fix_ragged_csv(filepath: Path, encoding: str) -> Path:
     import csv
 
-    print("Fixing ragged CSV file:", filepath)
+    logger.info("Fixing ragged CSV file: %s", filepath)
 
     dest_filepath = filepath.with_suffix(".fixed.csv")
     with open(filepath, "r", encoding=encoding) as f:
@@ -93,22 +96,23 @@ def _sniff_separator(filepath: Path, encoding: str) -> str:
     return max(counts, key=counts.__getitem__)
 
 
+def _resolve_columns(schema_dict: dict[int, tuple], date_key: int) -> tuple:
+    columns_names = list(schema_dict.values())[-1]
+    for key in schema_dict:
+        if date_key < key:
+            break
+        columns_names = schema_dict[key]
+    return columns_names
+
+
 def read_rais(filepath: Path, year: int, dataset: str, **read_csv_args) -> pl.DataFrame:
     if dataset == "vinculos":
-        columns_names = list(RAIS_VINCULOS_COLUMNS.values())[-1]
-        for y in RAIS_VINCULOS_COLUMNS:
-            if year < y:
-                break
-            columns_names = RAIS_VINCULOS_COLUMNS[y]
+        columns_names = _resolve_columns(RAIS_VINCULOS_COLUMNS, year)
     elif dataset == "estabelecimentos":
-        columns_names = list(RAIS_ESTABELECIMENTOS_COLUMNS.values())[-1]
-        for y in RAIS_ESTABELECIMENTOS_COLUMNS:
-            if year < y:
-                break
-            columns_names = RAIS_ESTABELECIMENTOS_COLUMNS[y]
+        columns_names = _resolve_columns(RAIS_ESTABELECIMENTOS_COLUMNS, year)
     else:
         raise ValueError(f"Unknown RAIS dataset: {dataset!r}")
-    print("Reading", dataset, filepath)
+    logger.info("Reading %s from %s", dataset, filepath)
     separator = _sniff_separator(filepath, encoding="latin1")
     df = pl.read_csv(
         filepath,
@@ -129,43 +133,23 @@ def read_caged(
 ) -> pl.DataFrame:
     if dataset == "caged":
         encoding = "latin-1"
-        columns_names = list(CAGED_COLUMNS.values())[-1]
-        for d in CAGED_COLUMNS:
-            if date < d:
-                break
-            columns_names = CAGED_COLUMNS[d]
+        columns_names = _resolve_columns(CAGED_COLUMNS, date)
     elif dataset == "caged-ajustes":
         encoding = "latin-1"
-        columns_names = list(CAGED_AJUSTES_COLUMNS.values())[-1]
-        for d in CAGED_AJUSTES_COLUMNS:
-            if date < d:
-                break
-            columns_names = CAGED_AJUSTES_COLUMNS[d]
+        columns_names = _resolve_columns(CAGED_AJUSTES_COLUMNS, date)
     elif dataset == "caged-2020-exc":
         encoding = "utf-8"
-        columns_names = list(CAGED_2020_EXC_COLUMNS.values())[-1]
-        for d in CAGED_2020_EXC_COLUMNS:
-            if date < d:
-                break
-            columns_names = CAGED_2020_EXC_COLUMNS[d]
+        columns_names = _resolve_columns(CAGED_2020_EXC_COLUMNS, date)
     elif dataset == "caged-2020-for":
         encoding = "utf-8"
-        columns_names = list(CAGED_2020_FOR_COLUMNS.values())[-1]
-        for d in CAGED_2020_FOR_COLUMNS:
-            if date < d:
-                break
-            columns_names = CAGED_2020_FOR_COLUMNS[d]
+        columns_names = _resolve_columns(CAGED_2020_FOR_COLUMNS, date)
     elif dataset == "caged-2020-mov":
         encoding = "utf-8"
-        columns_names = list(CAGED_2020_MOV_COLUMNS.values())[-1]
-        for d in CAGED_2020_MOV_COLUMNS:
-            if date < d:
-                break
-            columns_names = CAGED_2020_MOV_COLUMNS[d]
+        columns_names = _resolve_columns(CAGED_2020_MOV_COLUMNS, date)
     else:
         raise ValueError(f"Unknown CAGED dataset: {dataset!r}")
 
-    print("Reading", dataset, filepath)
+    logger.info("Reading %s from %s", dataset, filepath)
     if filepath.name in RAGGED_CSV_FILES:
         filepath = _fix_ragged_csv(filepath, encoding)
     df = pl.read_csv(
@@ -183,7 +167,7 @@ def read_caged(
 
 
 def write_parquet(df: pl.DataFrame, filepath: Path) -> Path:
-    print("Writing data to", filepath)
+    logger.info("Writing data to %s", filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)
     df.write_parquet(filepath)
     return filepath
@@ -191,7 +175,7 @@ def write_parquet(df: pl.DataFrame, filepath: Path) -> Path:
 
 def decompress(file_metadata: dict[str, Any]) -> dict[str, Path]:
     compressed_filepath = file_metadata["filepath"]
-    print(f"Decompressing {compressed_filepath}")
+    logger.info("Decompressing %s", compressed_filepath)
     tmp_dir = Path(tempfile.mkdtemp(prefix="pdet"))
     command = [
         "7z",

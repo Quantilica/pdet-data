@@ -14,6 +14,11 @@ def get_docs_filename(file_metadata: dict) -> str:
     return f"{name}@{modified:%Y%m%d}.{extension}"
 
 
+def get_docs_filepath(file_metadata: dict, dest_dir: Path) -> Path:
+    dataset = file_metadata["dataset"] + "[docs]"
+    return dest_dir / dataset / get_docs_filename(file_metadata)
+
+
 # -----------------------------------------------------------------------------
 # ---------------------------------- CAGED ------------------------------------
 # -----------------------------------------------------------------------------

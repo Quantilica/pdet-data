@@ -22,133 +22,68 @@ def get_columns(filepath: Path, encoding: str = "latin-1") -> list[str]:
     return df.columns
 
 
-def get_rais_estabelecimentos_columns(data_dir: Path):
-    f = open(
-        DIR / "rais-estabelecimentos-columns.csv", "w", encoding="utf-8", newline="\n"
-    )
-    writer = csv.DictWriter(f, fieldnames=["column", "order", "name", "date", "uf"])
-    writer.writeheader()
-    for file in data_dir.rglob("rais-*.*"):
-        print(file)
-        file_metadata = reader.parse_filename(file)
-        file_metadata = reader.decompress(file_metadata)
-        columns = get_columns(file_metadata["decompressed_filepath"])
-        shutil.rmtree(file_metadata["tmp_dir"])
-        print(file)
-        print(columns)
-        df_metadata = [
-            {
-                "column": column,
-                "order": order,
-                "name": file_metadata["name"],
-                "date": file_metadata["date"],
-                "uf": file_metadata["uf"],
-            }
-            for order, column in enumerate(columns)
-        ]
-        writer.writerows(df_metadata)
-    f.close()
+def extract_columns_for_dataset(
+    data_dir: Path, glob_pattern: str, output_file: Path, encoding: str = "latin-1", has_uf: bool = False
+) -> None:
+    fieldnames = ["column", "order", "name", "date"]
+    if has_uf:
+        fieldnames.append("uf")
+
+    with open(output_file, "w", encoding="utf-8", newline="\n") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for file in data_dir.rglob(glob_pattern):
+            print(file)
+            file_metadata = reader.parse_filename(file)
+            file_metadata = reader.decompress(file_metadata)
+            columns = get_columns(file_metadata["decompressed_filepath"], encoding=encoding)
+            shutil.rmtree(file_metadata["tmp_dir"])
+            print(file)
+            print(columns)
+            for order, column in enumerate(columns):
+                row = {
+                    "column": column,
+                    "order": order,
+                    "name": file_metadata["name"],
+                    "date": file_metadata["date"],
+                }
+                if has_uf:
+                    row["uf"] = file_metadata["uf"]
+                writer.writerow(row)
 
 
-def get_rais_vinculos_columns(data_dir: Path):
-    f = open(DIR / "rais-vinculos-columns.csv", "w", encoding="utf-8", newline="\n")
-    writer = csv.DictWriter(f, fieldnames=["column", "order", "name", "date", "uf"])
-    writer.writeheader()
-    for file in data_dir.rglob("rais-*.*"):
-        print(file)
-        file_metadata = reader.parse_filename(file)
-        file_metadata = reader.decompress(file_metadata)
-        columns = get_columns(file_metadata["decompressed_filepath"])
-        shutil.rmtree(file_metadata["tmp_dir"])
-        print(file)
-        print(columns)
-        df_metadata = [
-            {
-                "column": column,
-                "order": order,
-                "name": file_metadata["name"],
-                "date": file_metadata["date"],
-                "uf": file_metadata["uf"],
-            }
-            for order, column in enumerate(columns)
-        ]
-        writer.writerows(df_metadata)
-    f.close()
-
-
-def get_caged_columns(data_dir: Path):
-    f = open(DIR / "caged-columns.csv", "w", encoding="utf-8", newline="\n")
-    writer = csv.DictWriter(f, fieldnames=["column", "order", "name", "date", "uf"])
-    writer.writeheader()
-    for file in data_dir.rglob("caged_*.*"):
-        print(file)
-        file_metadata = reader.parse_filename(file)
-        file_metadata = reader.decompress(file_metadata)
-        columns = get_columns(file_metadata["decompressed_filepath"])
-        shutil.rmtree(file_metadata["tmp_dir"])
-        print(file)
-        print(columns)
-        df_metadata = [
-            {
-                "column": column,
-                "order": order,
-                "name": file_metadata["name"],
-                "date": file_metadata["date"],
-            }
-            for order, column in enumerate(columns)
-        ]
-        writer.writerows(df_metadata)
-    f.close()
-
-
-def get_caged_ajustes_columns(data_dir: Path):
-    f = open(DIR / "caged-ajustes-columns.csv", "w", encoding="utf-8", newline="\n")
-    writer = csv.DictWriter(f, fieldnames=["column", "order", "name", "date", "uf"])
-    writer.writeheader()
-    for file in data_dir.rglob("caged-ajustes_*.*"):
-        print(file)
-        file_metadata = reader.parse_filename(file)
-        file_metadata = reader.decompress(file_metadata)
-        columns = get_columns(file_metadata["decompressed_filepath"])
-        shutil.rmtree(file_metadata["tmp_dir"])
-        print(file)
-        print(columns)
-        df_metadata = [
-            {
-                "column": column,
-                "order": order,
-                "name": file_metadata["name"],
-                "date": file_metadata["date"],
-            }
-            for order, column in enumerate(columns)
-        ]
-        writer.writerows(df_metadata)
-    f.close()
-
-
-def get_caged_2020_columns(data_dir: Path):
-    f = open(DIR / "caged-2020-columns.csv", "w", encoding="utf-8", newline="\n")
-    writer = csv.DictWriter(f, fieldnames=["column", "order", "name", "date", "uf"])
-    writer.writeheader()
-    for file in data_dir.rglob("caged-2020-*.*"):
-        print(file)
-        file_metadata = reader.parse_filename(file)
-        file_metadata = reader.decompress(file_metadata)
-        columns = get_columns(file_metadata["decompressed_filepath"], encoding="utf-8")
-        shutil.rmtree(file_metadata["tmp_dir"])
-        print(file)
-        print(columns)
-        df_metadata = [
-            {
-                "column": column,
-                "order": order,
-                "name": file_metadata["name"],
-                "date": file_metadata["date"],
-            }
-            for order, column in enumerate(columns)
-        ]
-        writer.writerows(df_metadata)
-    f.close()
+DATASETS = {
+    "rais-estabelecimentos": {
+        "glob_pattern": "rais-*.*",
+        "output_file": "rais-estabelecimentos-columns.csv",
+        "has_uf": True,
+        "encoding": "latin-1",
+    },
+    "rais-vinculos": {
+        "glob_pattern": "rais-*.*",
+        "output_file": "rais-vinculos-columns.csv",
+        "has_uf": True,
+        "encoding": "latin-1",
+    },
+    "caged": {
+        "glob_pattern": "caged_*.*",
+        "output_file": "caged-columns.csv",
+        "has_uf": False,
+        "encoding": "latin-1",
+    },
+    "caged-ajustes": {
+        "glob_pattern": "caged-ajustes_*.*",
+        "output_file": "caged-ajustes-columns.csv",
+        "has_uf": False,
+        "encoding": "latin-1",
+    },
+    "caged-2020": {
+        "glob_pattern": "caged-2020-*.*",
+        "output_file": "caged-2020-columns.csv",
+        "has_uf": False,
+        "encoding": "utf-8",
+    },
+}
 
 
 def main():
@@ -158,17 +93,19 @@ def main():
     args = parser.parse_args()
     data_dir = args.data_dir
     dataset = args.dataset
-    match dataset:
-        case "rais-estabelecimentos":
-            get_rais_estabelecimentos_columns(data_dir)
-        case "rais-vinculos":
-            get_rais_vinculos_columns(data_dir)
-        case "caged":
-            get_caged_columns(data_dir)
-        case "caged-ajustes":
-            get_caged_ajustes_columns(data_dir)
-        case "caged-2020":
-            get_caged_2020_columns(data_dir)
+
+    if dataset not in DATASETS:
+        raise ValueError(f"Unknown dataset: {dataset}")
+
+    config = DATASETS[dataset]
+    output_file = DIR / config["output_file"]
+    extract_columns_for_dataset(
+        data_dir,
+        config["glob_pattern"],
+        output_file,
+        encoding=config["encoding"],
+        has_uf=config["has_uf"],
+    )
 
 
 if __name__ == "__main__":
