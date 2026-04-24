@@ -49,11 +49,18 @@ def main():
     data_dir = args.data_dir
     dest_dir = args.dest_dir
 
+    latest_files: dict[tuple, dict] = {}
     for file in data_dir.glob("**/caged*.*"):
         if file.suffix not in (".zip", ".7z"):
             continue
-        print(file)
-        convert_caged(file, dest_dir)
+        file_metadata = reader.parse_filename(file)
+        key = (file_metadata["dataset"], file_metadata["date"], file_metadata["uf"])
+        if key not in latest_files or file_metadata["modification"] > latest_files[key]["modification"]:
+            latest_files[key] = file_metadata
+
+    for file_metadata in latest_files.values():
+        print(file_metadata["filepath"])
+        convert_caged(file_metadata["filepath"], dest_dir)
 
 
 if __name__ == "__main__":

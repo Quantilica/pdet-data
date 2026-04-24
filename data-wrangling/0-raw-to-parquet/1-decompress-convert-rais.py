@@ -12,10 +12,13 @@ DIR = Path(__file__).parent.absolute()
 def convert_rais_directory(data_raw_rais_year_dir: Path, dataset: str, dest_intermediary_rais_dir: Path):
     year = int(data_raw_rais_year_dir.name)
     print(f"Converting RAIS {dataset} data for year {year}...")
-    files = []
+    all_files: dict[str | None, dict] = {}
     for file in data_raw_rais_year_dir.iterdir():
         file_metadata = reader.parse_filename(file)
-        files.append(file_metadata)
+        uf = file_metadata["uf"]
+        if uf not in all_files or file_metadata["modification"] > all_files[uf]["modification"]:
+            all_files[uf] = file_metadata
+    files = list(all_files.values())
 
     latest_modification = max(file_metadata["modification"] for file_metadata in files)
 
