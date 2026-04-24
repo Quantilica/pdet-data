@@ -14,6 +14,9 @@ dependencies = [
     "polars>=1.39",
 ]
 
+[project.scripts]
+pdet-data = "pdet_data.__main__:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
