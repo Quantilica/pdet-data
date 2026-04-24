@@ -7,3 +7,6 @@ dist/
 # Data files
 *.csv
 *.ods
+
+# uv lock
+uv.lock
