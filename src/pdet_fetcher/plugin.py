@@ -104,9 +104,9 @@ def cmd_sync(
     try:
         _run_sync(targets, output, show_progress=not verbose)
         console.print("[green]✓[/green] Sincronização concluída.")
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as err:
         console.print("[yellow]Sincronização cancelada pelo usuário.[/yellow]")
-        raise typer.Exit(code=130)
+        raise typer.Exit(code=130) from err
 
 
 @app.command("list")
@@ -225,6 +225,6 @@ def cmd_pipeline(
         convert_rais(output, parquet_out)
         convert_caged(output, parquet_out)
         console.print(f"[green]✓[/green] Parquet salvo em [dim]{parquet_out}[/dim]")
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as err:
         console.print("[yellow]Pipeline cancelado pelo usuário.[/yellow]")
-        raise typer.Exit(code=130)
+        raise typer.Exit(code=130) from err

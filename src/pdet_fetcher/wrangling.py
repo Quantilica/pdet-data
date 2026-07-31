@@ -89,7 +89,7 @@ def convert_caged(data_dir: Path, dest_dir: Path) -> None:
         date = file_metadata["date"]
         name = file_metadata["name"]
         dataset = file_metadata["dataset"]
-        filepath = file_metadata["filepath"]
+        file_metadata["filepath"]
 
         dest_filepath = dest_dir / dataset / f"{name}.parquet"
         if dest_filepath.exists():

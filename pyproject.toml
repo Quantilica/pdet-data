@@ -63,6 +63,10 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+"src/pdet_fetcher/__init__.py" = ["E402"]
+"src/pdet_fetcher/meta.py" = ["E501"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/pdet_fetcher"]
 

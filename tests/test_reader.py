@@ -1,8 +1,9 @@
-"""Tests for pdet_fetcher.reader — column schema resolution and decompress error handling."""
+"""Tests for pdet_fetcher.reader — schema resolution and decompress errors."""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from pdet_fetcher.constants import (
     CAGED_COLUMNS,
     RAIS_ESTABELECIMENTOS_COLUMNS,

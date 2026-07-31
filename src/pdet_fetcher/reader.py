@@ -185,8 +185,7 @@ def decompress(file_metadata: dict[str, Any]) -> dict[str, Path]:
     ]
     result = subprocess.run(
         command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
     )
     if result.returncode != 0:
         raise RuntimeError(
