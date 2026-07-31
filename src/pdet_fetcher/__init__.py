@@ -28,6 +28,7 @@ from .fetch import (
 from .wrangling import convert_caged, convert_rais, extract_columns_for_dataset
 
 __all__ = [
+    "__version__",
     "connect",
     "convert_caged",
     "convert_rais",

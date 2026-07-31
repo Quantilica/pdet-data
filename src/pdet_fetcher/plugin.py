@@ -165,8 +165,10 @@ def cmd_columns(
         Path,
         typer.Option("-o", "--output", help="Diretório para CSV de colunas"),
     ] = Path("."),
+    verbose: Annotated[bool, typer.Option("--verbose", help="Logs detalhados")] = False,
 ) -> None:
     """Extrair nomes de colunas dos arquivos brutos."""
+    setup_rich_logging(verbose, console=console)
     if dataset not in _DATASETS:
         console.print(f"[red]Dataset desconhecido:[/red] {dataset}")
         raise typer.Exit(1)
