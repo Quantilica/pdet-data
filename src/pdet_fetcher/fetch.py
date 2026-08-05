@@ -271,7 +271,7 @@ def _fetch_loop(
         finally:
             if task_id is not None:
                 with contextlib.suppress(Exception):
-                    file_progress.remove_task(task_id)
+                    pass
             if batch_task is not None:
                 batch_progress.update(batch_task, advance=1)
             elif pbar is not None:
