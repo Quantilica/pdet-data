@@ -216,7 +216,10 @@ def _fetch_loop(
     get_filepath_fn: Callable[[dict, Path], Path],
     dest_dir: Path,
     show_progress: bool = False,
+    workers: int = 4,
 ) -> list[dict[str, Any]]:
+    import concurrent.futures
+
     metadata_list = []
     files = list(list_fn())
     if not files:
@@ -240,6 +243,40 @@ def _fetch_loop(
         )
         live.start()
 
+    def _download_file(file, batch_task, pbar):
+        ftp_filepath = file["full_path"]
+        dest_filepath = get_filepath_fn(file, dest_dir)
+
+        task_id = None
+        if file_progress is not None:
+            task_id = file_progress.add_task(file["name"], total=file["size"] or 0)
+
+        def _chunk_cb(n: int, _tid=task_id) -> None:
+            if _tid is not None:
+                file_progress.update(_tid, advance=n)
+
+        try:
+            downloaded_path = client.download_with_manifest(
+                ftp_filepath,
+                dest_filepath,
+                source_id="pdet",
+                dataset_id=file.get("dataset", "unknown"),
+                producer="pdet-fetcher",
+                progress_callback=_chunk_cb if task_id is not None else None,
+            )
+            return file | {"filepath": downloaded_path}
+        except Exception as e:
+            logger.error(f"Failed to download {ftp_filepath}: {e}")
+            return None
+        finally:
+            if task_id is not None:
+                with contextlib.suppress(Exception):
+                    file_progress.remove_task(task_id)
+            if batch_task is not None:
+                batch_progress.update(batch_task, advance=1)
+            elif pbar is not None:
+                pbar.update(file["size"] or 0)
+
     try:
         for dataset_name, dataset_files in groups.items():
             batch_task = None
@@ -262,40 +299,15 @@ def _fetch_loop(
                         leave=True,
                     )
 
-            for file in dataset_files:
-                ftp_filepath = file["full_path"]
-                dest_filepath = get_filepath_fn(file, dest_dir)
-
-                task_id = None
-                if file_progress is not None:
-                    task_id = file_progress.add_task(
-                        file["name"], total=file["size"] or 0
-                    )
-
-                def _chunk_cb(n: int, _tid=task_id) -> None:
-                    if _tid is not None:
-                        file_progress.update(_tid, advance=n)
-
-                try:
-                    downloaded_path = client.download_with_manifest(
-                        ftp_filepath,
-                        dest_filepath,
-                        source_id="pdet",
-                        dataset_id=file.get("dataset", "unknown"),
-                        producer="pdet-fetcher",
-                        progress_callback=_chunk_cb if task_id is not None else None,
-                    )
-                    metadata_list.append(file | {"filepath": downloaded_path})
-                except Exception as e:
-                    logger.error(f"Failed to download {ftp_filepath}: {e}")
-                finally:
-                    if task_id is not None:
-                        with contextlib.suppress(Exception):
-                            file_progress.remove_task(task_id)
-                    if batch_task is not None:
-                        batch_progress.update(batch_task, advance=1)
-                    elif pbar is not None:
-                        pbar.update(file["size"] or 0)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+                futures = [
+                    executor.submit(_download_file, f, batch_task, pbar)
+                    for f in dataset_files
+                ]
+                for future in concurrent.futures.as_completed(futures):
+                    res = future.result()
+                    if res:
+                        metadata_list.append(res)
 
             if pbar is not None:
                 pbar.close()
@@ -326,18 +338,22 @@ def list_caged_docs() -> Generator[dict, None, None]:
         yield file | {"dataset": "caged-ajustes"}
 
 
-def fetch_caged(dest_dir: Path, show_progress: bool = False) -> list[dict[str, Any]]:
+def fetch_caged(
+    dest_dir: Path, show_progress: bool = False, workers: int = 4
+) -> list[dict[str, Any]]:
     from .storage import get_caged_filepath
 
-    return _fetch_loop(list_caged, get_caged_filepath, dest_dir, show_progress)
+    return _fetch_loop(list_caged, get_caged_filepath, dest_dir, show_progress, workers)
 
 
 def fetch_caged_docs(
-    dest_dir: Path, show_progress: bool = False
+    dest_dir: Path, show_progress: bool = False, workers: int = 4
 ) -> list[dict[str, Any]]:
     from .storage import get_docs_filepath
 
-    return _fetch_loop(list_caged_docs, get_docs_filepath, dest_dir, show_progress)
+    return _fetch_loop(
+        list_caged_docs, get_docs_filepath, dest_dir, show_progress, workers
+    )
 
 
 def list_caged_2020() -> Generator[dict, None, None]:
@@ -353,21 +369,23 @@ def list_caged_2020_docs() -> Generator[dict, None, None]:
 
 
 def fetch_caged_2020(
-    dest_dir: Path, show_progress: bool = False
+    dest_dir: Path, show_progress: bool = False, workers: int = 4
 ) -> list[dict[str, Any]]:
     from .storage import get_caged_2020_filepath
 
     return _fetch_loop(
-        list_caged_2020, get_caged_2020_filepath, dest_dir, show_progress
+        list_caged_2020, get_caged_2020_filepath, dest_dir, show_progress, workers
     )
 
 
 def fetch_caged_2020_docs(
-    dest_dir: Path, show_progress: bool = False
+    dest_dir: Path, show_progress: bool = False, workers: int = 4
 ) -> list[dict[str, Any]]:
     from .storage import get_docs_filepath
 
-    return _fetch_loop(list_caged_2020_docs, get_docs_filepath, dest_dir, show_progress)
+    return _fetch_loop(
+        list_caged_2020_docs, get_docs_filepath, dest_dir, show_progress, workers
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -385,18 +403,22 @@ def list_rais_docs() -> Generator[dict, None, None]:
         yield file | {"dataset": "rais-estabelecimentos"}
 
 
-def fetch_rais(dest_dir: Path, show_progress: bool = False) -> list[dict[str, Any]]:
+def fetch_rais(
+    dest_dir: Path, show_progress: bool = False, workers: int = 4
+) -> list[dict[str, Any]]:
     from .storage import get_rais_filepath
 
-    return _fetch_loop(list_rais, get_rais_filepath, dest_dir, show_progress)
+    return _fetch_loop(list_rais, get_rais_filepath, dest_dir, show_progress, workers)
 
 
 def fetch_rais_docs(
-    dest_dir: Path, show_progress: bool = False
+    dest_dir: Path, show_progress: bool = False, workers: int = 4
 ) -> list[dict[str, Any]]:
     from .storage import get_docs_filepath
 
-    return _fetch_loop(list_rais_docs, get_docs_filepath, dest_dir, show_progress)
+    return _fetch_loop(
+        list_rais_docs, get_docs_filepath, dest_dir, show_progress, workers
+    )
 
 
 def generate_catalog(

@@ -70,12 +70,14 @@ _DATASETS = {
 }
 
 
-def _run_sync(targets: list[str], output: Path, show_progress: bool) -> None:
+def _run_sync(
+    targets: list[str], output: Path, show_progress: bool, workers: int = 4
+) -> None:
     """Baixar os datasets selecionados via FTP."""
     for dataset in targets:
         data_fn, docs_fn = _DATASET_FETCHERS[dataset]
-        data_fn(dest_dir=output, show_progress=show_progress)
-        docs_fn(dest_dir=output, show_progress=show_progress)
+        data_fn(dest_dir=output, show_progress=show_progress, workers=workers)
+        docs_fn(dest_dir=output, show_progress=show_progress, workers=workers)
 
 
 @app.command("sync")
@@ -89,6 +91,9 @@ def cmd_sync(
     output: Annotated[
         Path, typer.Option("-o", "--output", help="Diretório de destino")
     ] = _DEFAULT_OUTPUT,
+    workers: Annotated[
+        int, typer.Option("--workers", help="Número de downloads paralelos")
+    ] = 4,
     verbose: Annotated[bool, typer.Option("--verbose", help="Logs detalhados")] = False,
 ) -> None:
     """Sincronizar microdados do PDET via FTP."""
@@ -102,7 +107,7 @@ def cmd_sync(
         raise typer.Exit(1)
 
     try:
-        _run_sync(targets, output, show_progress=not verbose)
+        _run_sync(targets, output, show_progress=not verbose, workers=workers)
         console.print("[green]✓[/green] Sincronização concluída.")
     except KeyboardInterrupt as err:
         console.print("[yellow]Sincronização cancelada pelo usuário.[/yellow]")
@@ -203,6 +208,9 @@ def cmd_pipeline(
             help="Diretório para os Parquet (padrão: igual a --output)",
         ),
     ] = None,
+    workers: Annotated[
+        int, typer.Option("--workers", help="Número de downloads paralelos")
+    ] = 4,
     verbose: Annotated[bool, typer.Option("--verbose", help="Logs detalhados")] = False,
 ) -> None:
     """Pipeline completo do PDET (sync → convert)."""
@@ -218,7 +226,7 @@ def cmd_pipeline(
 
     try:
         console.print(Rule("[bold]Passo 1/2: Download[/bold]"))
-        _run_sync(targets, output, show_progress=not verbose)
+        _run_sync(targets, output, show_progress=not verbose, workers=workers)
         console.print("[green]✓[/green] Download concluído.")
 
         console.print(Rule("[bold]Passo 2/2: Conversão[/bold]"))

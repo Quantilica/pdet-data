@@ -71,20 +71,20 @@ def _resolve_targets(datasets: list[str] | None) -> list[str]:
     return targets
 
 
-def _run_sync(targets: list[str], output: Path, show_progress: bool) -> None:
-    ftp = connect()
-    try:
-        for dataset in targets:
-            data_fn, docs_fn = _DATASET_FETCHERS[dataset]
-            data_fn(ftp=ftp, dest_dir=output, show_progress=show_progress)
-            docs_fn(ftp=ftp, dest_dir=output, show_progress=show_progress)
-    finally:
-        ftp.close()
+def _run_sync(
+    targets: list[str], output: Path, show_progress: bool, workers: int = 4
+) -> None:
+    for dataset in targets:
+        data_fn, docs_fn = _DATASET_FETCHERS[dataset]
+        data_fn(dest_dir=output, show_progress=show_progress, workers=workers)
+        docs_fn(dest_dir=output, show_progress=show_progress, workers=workers)
 
 
 def handle_sync(args: argparse.Namespace) -> None:
     targets = _resolve_targets(args.datasets)
-    _run_sync(targets, args.output, show_progress=not args.verbose)
+    _run_sync(
+        targets, args.output, show_progress=not args.verbose, workers=args.workers
+    )
 
 
 def handle_list(args: argparse.Namespace) -> None:
@@ -121,7 +121,9 @@ def handle_columns(args: argparse.Namespace) -> None:
 def handle_pipeline(args: argparse.Namespace) -> None:
     targets = _resolve_targets(args.datasets)
     parquet_out = args.parquet_dir or args.output
-    _run_sync(targets, args.output, show_progress=not args.verbose)
+    _run_sync(
+        targets, args.output, show_progress=not args.verbose, workers=args.workers
+    )
     convert_rais(args.output, parquet_out)
     convert_caged(args.output, parquet_out)
 
@@ -159,6 +161,12 @@ def get_parser() -> argparse.ArgumentParser:
         type=Path,
         default=_DEFAULT_OUTPUT,
         help="Diretório de destino (padrão: /data/pdet)",
+    )
+    p_sync.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        help="Número de downloads paralelos",
     )
     p_sync.set_defaults(func=handle_sync)
 
@@ -238,6 +246,12 @@ def get_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Diretório para os Parquet (padrão: igual a --output)",
+    )
+    p_pipeline.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        help="Número de downloads paralelos",
     )
     p_pipeline.set_defaults(func=handle_pipeline)
 
