@@ -14,7 +14,9 @@ from tqdm import tqdm as _tqdm
 
 try:
     from quantilica.core.cli import (
+        ProgressPool,
         get_console,
+        graceful_executor,
         make_batch_progress,
         make_download_progress,
     )
@@ -231,11 +233,13 @@ def _fetch_loop(
 
     live = None
     batch_progress = file_progress = None
+    pool = None
 
     if show_progress and _RICH_AVAILABLE:
         console = get_console()
         batch_progress = make_batch_progress(console)
         file_progress = make_download_progress(console)
+        pool = ProgressPool(workers=workers, file_prog=file_progress)
         live = Live(
             Group(batch_progress, file_progress),
             console=console,
@@ -243,58 +247,43 @@ def _fetch_loop(
         )
         live.start()
 
-        import threading
-
-        lock = threading.Lock()
-        worker_task_ids = [
-            file_progress.add_task("[dim]Inativo[/dim]", total=1)
-            for _ in range(workers)
-        ]
-        available_tasks = worker_task_ids.copy()
-
     def _download_file(file, batch_task, pbar):
         ftp_filepath = file["full_path"]
         dest_filepath = get_filepath_fn(file, dest_dir)
 
-        task_id = None
-        if file_progress is not None:
-            with lock:
-                task_id = available_tasks.pop(0)
-            file_progress.update(
-                task_id,
-                description=f"[cyan]{file['name']}[/cyan]",
-                completed=0,
-                total=file["size"] or None,
-            )
-
-        def _chunk_cb(n: int, _tid=task_id) -> None:
-            if _tid is not None:
-                file_progress.update(_tid, advance=n)
+        ctx = (
+            pool.acquire(description=f"[cyan]{file['name']}[/cyan]")
+            if pool
+            else contextlib.nullcontext()
+        )
 
         try:
-            downloaded_path = client.download_with_manifest(
-                ftp_filepath,
-                dest_filepath,
-                source_id="pdet",
-                dataset_id=file.get("dataset", "unknown"),
-                producer="pdet-fetcher",
-                progress_callback=_chunk_cb if task_id is not None else None,
-            )
-            return file | {"filepath": downloaded_path}
+            with ctx as cb:
+                downloaded_bytes = 0
+
+                def _chunk_cb(n: int) -> None:
+                    nonlocal downloaded_bytes
+                    downloaded_bytes += n
+                    if cb is not None:
+                        cb(downloaded_bytes, file["size"] or 0)
+                    if pbar is not None:
+                        pbar.update(n)
+
+                downloaded_path = client.download_with_manifest(
+                    ftp_filepath,
+                    dest_filepath,
+                    source_id="pdet",
+                    dataset_id=file.get("dataset", "unknown"),
+                    producer="pdet-fetcher",
+                    progress_callback=_chunk_cb,
+                )
+                return file | {"filepath": downloaded_path}
         except Exception as e:
             logger.error(f"Failed to download {ftp_filepath}: {e}")
             return None
         finally:
-            if task_id is not None:
-                with lock:
-                    file_progress.update(
-                        task_id, description="[dim]Inativo[/dim]", completed=0, total=1
-                    )
-                    available_tasks.append(task_id)
             if batch_task is not None:
                 batch_progress.update(batch_task, advance=1)
-            elif pbar is not None:
-                pbar.update(file["size"] or 0)
 
     try:
         for dataset_name, dataset_files in groups.items():
@@ -307,18 +296,24 @@ def _fetch_loop(
                         f"[cyan]{dataset_name}[/cyan]",
                         total=len(dataset_files),
                     )
-                else:
-                    total_bytes = sum(f["size"] or 0 for f in dataset_files)
-                    pbar = _tqdm(
-                        total=total_bytes,
-                        desc=dataset_name,
-                        unit="B",
-                        unit_scale=True,
-                        unit_divisor=1024,
-                        leave=True,
-                    )
+            if show_progress and not _RICH_AVAILABLE:
+                total_bytes = sum(f["size"] or 0 for f in dataset_files)
+                pbar = _tqdm(
+                    total=total_bytes,
+                    desc=dataset_name,
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    leave=True,
+                )
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+            # Usa graceful_executor se disponível (rich), senão fallback
+            exec_ctx = (
+                graceful_executor(max_workers=workers)
+                if _RICH_AVAILABLE
+                else concurrent.futures.ThreadPoolExecutor(max_workers=workers)
+            )
+            with exec_ctx as executor:
                 futures = [
                     executor.submit(_download_file, f, batch_task, pbar)
                     for f in dataset_files
