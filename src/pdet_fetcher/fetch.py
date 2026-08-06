@@ -243,13 +243,29 @@ def _fetch_loop(
         )
         live.start()
 
+        import threading
+
+        lock = threading.Lock()
+        worker_task_ids = [
+            file_progress.add_task("[dim]Inativo[/dim]", total=1)
+            for _ in range(workers)
+        ]
+        available_tasks = worker_task_ids.copy()
+
     def _download_file(file, batch_task, pbar):
         ftp_filepath = file["full_path"]
         dest_filepath = get_filepath_fn(file, dest_dir)
 
         task_id = None
         if file_progress is not None:
-            task_id = file_progress.add_task(file["name"], total=file["size"] or 0)
+            with lock:
+                task_id = available_tasks.pop(0)
+            file_progress.update(
+                task_id,
+                description=f"[cyan]{file['name']}[/cyan]",
+                completed=0,
+                total=file["size"] or None,
+            )
 
         def _chunk_cb(n: int, _tid=task_id) -> None:
             if _tid is not None:
@@ -270,8 +286,11 @@ def _fetch_loop(
             return None
         finally:
             if task_id is not None:
-                with contextlib.suppress(Exception):
-                    pass
+                with lock:
+                    file_progress.update(
+                        task_id, description="[dim]Inativo[/dim]", completed=0, total=1
+                    )
+                    available_tasks.append(task_id)
             if batch_task is not None:
                 batch_progress.update(batch_task, advance=1)
             elif pbar is not None:
