@@ -7,7 +7,6 @@ from collections.abc import Callable, Generator, Sequence
 from pathlib import Path
 from typing import Any
 
-import quantilica.catalog.metadata as core_meta
 from quantilica.core.ftp import FTP_TRANSIENT_ERRORS, FtpClient, ftp_connect
 from quantilica.core.retry import exponential_delay
 from tqdm import tqdm as _tqdm
@@ -433,53 +432,3 @@ def fetch_rais_docs(
     return _fetch_loop(
         list_rais_docs, get_docs_filepath, dest_dir, show_progress, workers
     )
-
-
-def generate_catalog(
-    downloaded_files: list[dict],
-) -> core_meta.MetadataCatalog:
-    """Generate a validated MetadataCatalog from a list of downloaded PDET files."""
-    source_id = "pdet"
-    source = core_meta.Source(
-        id=source_id,
-        name="PDET - Programa de Disseminação de Estatísticas do Trabalho",
-        homepage_url="http://pdet.mte.gov.br",
-    )
-
-    datasets_map = {}
-    resources = []
-
-    for file in downloaded_files:
-        dataset_id = file.get("dataset", "unknown")
-        if dataset_id not in datasets_map:
-            datasets_map[dataset_id] = core_meta.Dataset(
-                id=dataset_id,
-                source_id=source_id,
-                name=dataset_id.upper().replace("-", " "),
-            )
-
-        filename = file["filepath"].name
-        resource_id = filename.replace(".", "_")
-
-        resources.append(
-            core_meta.Resource(
-                id=resource_id,
-                dataset_id=dataset_id,
-                name=filename,
-                url=file["full_path"],  # FTP path
-                format=file.get("extension", ""),
-                path=str(file["filepath"].absolute()),
-                metadata={
-                    "remote_datetime": file["datetime"].isoformat(),
-                    "size": file["size"],
-                },
-            )
-        )
-
-    catalog = core_meta.MetadataCatalog(
-        sources=[source],
-        datasets=list(datasets_map.values()),
-        resources=resources,
-    )
-    catalog.validate_references()
-    return catalog
