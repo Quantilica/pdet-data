@@ -7,13 +7,13 @@ from collections.abc import Callable, Generator, Sequence
 from pathlib import Path
 from typing import Any
 
-import quantilica.core.metadata as core_meta
+import quantilica.catalog.metadata as core_meta
 from quantilica.core.ftp import FTP_TRANSIENT_ERRORS, FtpClient, ftp_connect
 from quantilica.core.retry import exponential_delay
 from tqdm import tqdm as _tqdm
 
 try:
-    from quantilica.core.cli import (
+    from quantilica.cli.ui import (
         ProgressPool,
         get_console,
         graceful_executor,

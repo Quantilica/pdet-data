@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from quantilica.core.cli import get_console, setup_rich_logging
+from quantilica.cli.ui import get_console, setup_rich_logging
 from rich.rule import Rule
 from rich.table import Table
 
