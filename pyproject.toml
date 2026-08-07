@@ -1,6 +1,6 @@
 [project]
 name = "pdet-fetcher"
-version = "0.3.0"
+version = "0.3.1"
 description = "Collect microdata from PDET (CAGED, RAIS)"
 readme = "README.md"
 authors = [
@@ -31,7 +31,9 @@ classifiers = [
 ]
 dependencies = [
     "polars>=1.39",
-    "quantilica-core>=0.3.2",
+    "quantilica-core>=0.4.0",
+    "quantilica-cli>=0.2.0",
+    "quantilica-catalog>=0.2.0",
     "tqdm>=4.67",
 ]
 
