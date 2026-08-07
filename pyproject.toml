@@ -1,6 +1,6 @@
 [project]
 name = "pdet-fetcher"
-version = "0.2.0"
+version = "0.3.0"
 description = "Collect microdata from PDET (CAGED, RAIS)"
 readme = "README.md"
 authors = [
