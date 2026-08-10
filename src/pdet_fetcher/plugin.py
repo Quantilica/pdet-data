@@ -14,9 +14,6 @@ from rich.rule import Rule
 from rich.table import Table
 
 from pdet_fetcher import (
-    convert_caged,
-    convert_rais,
-    extract_columns_for_dataset,
     fetch_caged,
     fetch_caged_2020,
     fetch_caged_2020_docs,
@@ -151,6 +148,18 @@ def cmd_convert(
 ) -> None:
     """Converter arquivos brutos para Parquet."""
     setup_rich_logging(verbose, console=console)
+    try:
+        from pdet_fetcher import convert_caged, convert_rais
+
+        if convert_rais is None or convert_caged is None:
+            raise ImportError
+    except ImportError:
+        console.print(
+            "[red]Erro:[/red] convert requer extras de análise: "
+            "pip install pdet-fetcher[analysis]"
+        )
+        raise typer.Exit(1) from None
+
     convert_rais(input, output)
     convert_caged(input, output)
     console.print("[green]✓[/green] Conversão concluída.")
@@ -177,6 +186,19 @@ def cmd_columns(
     if dataset not in _DATASETS:
         console.print(f"[red]Dataset desconhecido:[/red] {dataset}")
         raise typer.Exit(1)
+
+    try:
+        from pdet_fetcher import extract_columns_for_dataset
+
+        if extract_columns_for_dataset is None:
+            raise ImportError
+    except ImportError:
+        console.print(
+            "[red]Erro:[/red] columns requer extras de análise: "
+            "pip install pdet-fetcher[analysis]"
+        )
+        raise typer.Exit(1) from None
+
     cfg = _DATASETS[dataset]
     output_file = output / f"{dataset}-columns.csv"
     extract_columns_for_dataset(
@@ -230,6 +252,18 @@ def cmd_pipeline(
         console.print("[green]✓[/green] Download concluído.")
 
         console.print(Rule("[bold]Passo 2/2: Conversão[/bold]"))
+        try:
+            from pdet_fetcher import convert_caged, convert_rais
+
+            if convert_caged is None or convert_rais is None:
+                raise ImportError
+        except ImportError:
+            console.print(
+                "[red]Erro:[/red] pipeline (conversão) requer extras de análise: "
+                "pip install pdet-fetcher[analysis]"
+            )
+            raise typer.Exit(1) from None
+
         convert_rais(output, parquet_out)
         convert_caged(output, parquet_out)
         console.print(f"[green]✓[/green] Parquet salvo em [dim]{parquet_out}[/dim]")

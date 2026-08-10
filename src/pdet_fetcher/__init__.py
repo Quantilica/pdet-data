@@ -25,14 +25,20 @@ from .fetch import (
     list_rais,
     list_rais_docs,
 )
-from .wrangling import convert_caged, convert_rais, extract_columns_for_dataset
+
+try:
+    from .wrangling import convert_caged, convert_rais, extract_columns_for_dataset
+
+    _HAS_ANALYSIS = True
+except ImportError:
+    _HAS_ANALYSIS = False
+    convert_caged = None
+    convert_rais = None
+    extract_columns_for_dataset = None
 
 __all__ = [
     "__version__",
     "connect",
-    "convert_caged",
-    "convert_rais",
-    "extract_columns_for_dataset",
     "fetch_caged",
     "fetch_caged_2020",
     "fetch_caged_2020_docs",
@@ -46,3 +52,12 @@ __all__ = [
     "list_rais",
     "list_rais_docs",
 ]
+
+if _HAS_ANALYSIS:
+    __all__.extend(
+        [
+            "convert_caged",
+            "convert_rais",
+            "extract_columns_for_dataset",
+        ]
+    )

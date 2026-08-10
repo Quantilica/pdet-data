@@ -30,9 +30,13 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "polars>=1.39",
     "quantilica-core>=0.4.0",
     "tqdm>=4.67",
+]
+
+[project.optional-dependencies]
+analysis = [
+    "polars>=1.39",
 ]
 
 [project.urls]
