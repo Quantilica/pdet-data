@@ -238,38 +238,9 @@ def cmd_pipeline(
 
     try:
         console.print(Rule("[bold]Passo 1/2: Download[/bold]"))
-        import concurrent.futures
-
-        from quantilica.cli.ui import (
-            ProgressPool,
-            graceful_executor,
-            make_batch_progress,
-            make_download_progress,
-        )
-        from rich.console import Group
-        from rich.live import Live
-
         entries = [e for g in targets for e in fetcher.list_datasets(g)]
 
-        overall = make_batch_progress(console)
-        file_prog = make_download_progress(console)
-        overall_task = overall.add_task("[cyan]Baixando...[/cyan]", total=len(entries))
-        pool = ProgressPool(workers=workers, file_prog=file_prog)
-
-        def _worker(entry):
-            eid = entry.get("id", "unknown")
-            with pool.acquire(description=f"[cyan]{eid}[/cyan]") as cb:
-                fetcher.download_entry(entry, output, progress=cb)
-                return True
-
-        with graceful_executor(max_workers=workers) as executor:
-            with Live(
-                Group(overall, file_prog), console=console, refresh_per_second=10
-            ):
-                futures = {executor.submit(_worker, entry): entry for entry in entries}
-                for future in concurrent.futures.as_completed(futures):
-                    overall.update(overall_task, advance=1)
-                    future.result()
+        fetcher.download_datasets(entries, output, workers=workers)
 
         console.print("[green]✓[/green] Download concluído.")
 
