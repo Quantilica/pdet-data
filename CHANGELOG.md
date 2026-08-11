@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.5.1] - 2026-08-10
+### Corrigido
+- Atualizada dependência `quantilica-core` para `>=0.5.0` devido às novas assinaturas requeridas pelo CLI.
+- Adicionada dependência implícita do `polars>=1.0.0` requerida pelo `reader.py`.
+
 ## [0.5.0] - 2026-08-10
 ### Alterado
 - Migração completa da CLI para utilização da SDK unificada (`FetcherApp`).
