@@ -3,25 +3,12 @@ import datetime as dt
 import ftplib
 import re
 import time
-from collections.abc import Callable, Generator, Sequence
-from pathlib import Path
-from typing import Any
+from collections.abc import Generator, Sequence
 
 from quantilica.core.ftp import FTP_TRANSIENT_ERRORS, FtpClient, ftp_connect
 from quantilica.core.retry import exponential_delay
-from tqdm import tqdm as _tqdm
 
 try:
-    from quantilica.cli.ui import (
-        ProgressPool,
-        get_console,
-        graceful_executor,
-        make_batch_progress,
-        make_download_progress,
-    )
-    from rich.console import Group
-    from rich.live import Live
-
     _RICH_AVAILABLE = True
 except (ModuleNotFoundError, ImportError):  # pragma: no cover
     _RICH_AVAILABLE = False
@@ -115,6 +102,8 @@ def list_files(directory: str) -> list[dict]:
             except IndexError:
                 extension = None
             file = {
+                "id": name,
+                "url": f"{directory}/{name}".replace("//", "/"),
                 "datetime": datetime,
                 "size": size,
                 "name": name,
@@ -192,7 +181,7 @@ def _list_variation_files(variation: dict) -> Generator[dict, None, None]:
             yield from (f | date_dir_meta for f in files)
     else:
         files = list_files(ftp_path)
-        yield from (f | {"year": None} for f in files)
+        yield from (f | {"year": None, "group": variation["group"]} for f in files)
 
 
 def _get_variation_files_metadata(variation: dict) -> Generator[dict, None, None]:
@@ -208,128 +197,9 @@ def _get_variation_files_metadata(variation: dict) -> Generator[dict, None, None
 
 def _list_dataset_files(dataset: str) -> Generator[dict, None, None]:
     for variation in datasets[dataset]["variations"]:
+        variation = variation | {"group": dataset}
         for f in _get_variation_files_metadata(variation=variation):
-            yield f | {"dataset": dataset}
-
-
-def _fetch_loop(
-    list_fn: Callable[[], Generator[dict, None, None]],
-    get_filepath_fn: Callable[[dict, Path], Path],
-    dest_dir: Path,
-    show_progress: bool = False,
-    workers: int = 4,
-) -> list[dict[str, Any]]:
-    import concurrent.futures
-
-    metadata_list = []
-    files = list(list_fn())
-    if not files:
-        return metadata_list
-
-    groups: dict[str, list[dict]] = {}
-    for f in files:
-        groups.setdefault(f.get("dataset", "unknown"), []).append(f)
-
-    live = None
-    batch_progress = file_progress = None
-    pool = None
-
-    if show_progress and _RICH_AVAILABLE:
-        console = get_console()
-        batch_progress = make_batch_progress(console)
-        file_progress = make_download_progress(console)
-        pool = ProgressPool(workers=workers, file_prog=file_progress)
-        live = Live(
-            Group(batch_progress, file_progress),
-            console=console,
-            refresh_per_second=10,
-        )
-        live.start()
-
-    def _download_file(file, batch_task, pbar):
-        ftp_filepath = file["full_path"]
-        dest_filepath = get_filepath_fn(file, dest_dir)
-
-        ctx = (
-            pool.acquire(description=f"[cyan]{file['name']}[/cyan]")
-            if pool
-            else contextlib.nullcontext()
-        )
-
-        try:
-            with ctx as cb:
-                downloaded_bytes = 0
-
-                def _chunk_cb(n: int) -> None:
-                    nonlocal downloaded_bytes
-                    downloaded_bytes += n
-                    if cb is not None:
-                        cb(downloaded_bytes, file["size"] or 0)
-                    if pbar is not None:
-                        pbar.update(n)
-
-                downloaded_path = client.download_with_manifest(
-                    ftp_filepath,
-                    dest_filepath,
-                    source_id="pdet",
-                    dataset_id=file.get("dataset", "unknown"),
-                    producer="pdet-fetcher",
-                    progress=_chunk_cb,
-                )
-                return file | {"filepath": downloaded_path}
-        except Exception as e:
-            logger.error(f"Failed to download {ftp_filepath}: {e}")
-            return None
-        finally:
-            if batch_task is not None:
-                batch_progress.update(batch_task, advance=1)
-
-    try:
-        for dataset_name, dataset_files in groups.items():
-            batch_task = None
-            pbar = None
-
-            if show_progress:
-                if batch_progress is not None:
-                    batch_task = batch_progress.add_task(
-                        f"[cyan]{dataset_name}[/cyan]",
-                        total=len(dataset_files),
-                    )
-            if show_progress and not _RICH_AVAILABLE:
-                total_bytes = sum(f["size"] or 0 for f in dataset_files)
-                pbar = _tqdm(
-                    total=total_bytes,
-                    desc=dataset_name,
-                    unit="B",
-                    unit_scale=True,
-                    unit_divisor=1024,
-                    leave=True,
-                )
-
-            # Usa graceful_executor se disponível (rich), senão fallback
-            exec_ctx = (
-                graceful_executor(max_workers=workers)
-                if _RICH_AVAILABLE
-                else concurrent.futures.ThreadPoolExecutor(max_workers=workers)
-            )
-            with exec_ctx as executor:
-                futures = [
-                    executor.submit(_download_file, f, batch_task, pbar)
-                    for f in dataset_files
-                ]
-                for future in concurrent.futures.as_completed(futures):
-                    res = future.result()
-                    if res:
-                        metadata_list.append(res)
-
-            if pbar is not None:
-                pbar.close()
-    finally:
-        if live is not None:
-            with contextlib.suppress(Exception):
-                live.stop()
-
-    return metadata_list
+            yield f | {"dataset": dataset, "group": dataset}
 
 
 # -----------------------------------------------------------------------------
@@ -344,29 +214,21 @@ def list_caged_docs() -> Generator[dict, None, None]:
     for file in list_files(docs["caged"]["dir_path"]):
         if not re.match(docs["caged"]["fn_pattern"], file["name"]):
             continue
-        yield file | {"dataset": "caged"}
+        yield file | {
+            "dataset": "caged",
+            "group": "caged",
+            "year": None,
+            "ext": file["extension"],
+        }
     for file in list_files(docs["caged-ajustes"]["dir_path"]):
         if not re.match(docs["caged-ajustes"]["fn_pattern"], file["name"]):
             continue
-        yield file | {"dataset": "caged-ajustes"}
-
-
-def fetch_caged(
-    dest_dir: Path, show_progress: bool = False, workers: int = 4
-) -> list[dict[str, Any]]:
-    from .storage import get_caged_filepath
-
-    return _fetch_loop(list_caged, get_caged_filepath, dest_dir, show_progress, workers)
-
-
-def fetch_caged_docs(
-    dest_dir: Path, show_progress: bool = False, workers: int = 4
-) -> list[dict[str, Any]]:
-    from .storage import get_docs_filepath
-
-    return _fetch_loop(
-        list_caged_docs, get_docs_filepath, dest_dir, show_progress, workers
-    )
+        yield file | {
+            "dataset": "caged-ajustes",
+            "group": "caged-ajustes",
+            "year": None,
+            "ext": file["extension"],
+        }
 
 
 def list_caged_2020() -> Generator[dict, None, None]:
@@ -378,27 +240,12 @@ def list_caged_2020_docs() -> Generator[dict, None, None]:
     for file in list_files(docs["caged-2020"]["dir_path"]):
         if not re.match(docs["caged-2020"]["fn_pattern"], file["name"]):
             continue
-        yield file | {"dataset": "caged-2020"}
-
-
-def fetch_caged_2020(
-    dest_dir: Path, show_progress: bool = False, workers: int = 4
-) -> list[dict[str, Any]]:
-    from .storage import get_caged_2020_filepath
-
-    return _fetch_loop(
-        list_caged_2020, get_caged_2020_filepath, dest_dir, show_progress, workers
-    )
-
-
-def fetch_caged_2020_docs(
-    dest_dir: Path, show_progress: bool = False, workers: int = 4
-) -> list[dict[str, Any]]:
-    from .storage import get_docs_filepath
-
-    return _fetch_loop(
-        list_caged_2020_docs, get_docs_filepath, dest_dir, show_progress, workers
-    )
+        yield file | {
+            "dataset": "caged-2020",
+            "group": "caged-2020",
+            "year": None,
+            "ext": file["extension"],
+        }
 
 
 # -----------------------------------------------------------------------------
@@ -411,24 +258,16 @@ def list_rais() -> Generator[dict, None, None]:
 
 def list_rais_docs() -> Generator[dict, None, None]:
     for file in list_files(docs["rais-vinculos"]["dir_path"]):
-        yield file | {"dataset": "rais-vinculos"}
+        yield file | {
+            "dataset": "rais-vinculos",
+            "group": "rais-vinculos",
+            "year": None,
+            "ext": file["extension"],
+        }
     for file in list_files(docs["rais-estabelecimentos"]["dir_path"]):
-        yield file | {"dataset": "rais-estabelecimentos"}
-
-
-def fetch_rais(
-    dest_dir: Path, show_progress: bool = False, workers: int = 4
-) -> list[dict[str, Any]]:
-    from .storage import get_rais_filepath
-
-    return _fetch_loop(list_rais, get_rais_filepath, dest_dir, show_progress, workers)
-
-
-def fetch_rais_docs(
-    dest_dir: Path, show_progress: bool = False, workers: int = 4
-) -> list[dict[str, Any]]:
-    from .storage import get_docs_filepath
-
-    return _fetch_loop(
-        list_rais_docs, get_docs_filepath, dest_dir, show_progress, workers
-    )
+        yield file | {
+            "dataset": "rais-estabelecimentos",
+            "group": "rais-estabelecimentos",
+            "year": None,
+            "ext": file["extension"],
+        }

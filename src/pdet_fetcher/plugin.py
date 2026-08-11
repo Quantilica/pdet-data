@@ -5,37 +5,94 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
+from quantilica.cli.sdk import FetcherApp
 from quantilica.cli.ui import get_console, setup_rich_logging
+from quantilica.core.ftp import FtpClient
 from rich.rule import Rule
-from rich.table import Table
 
 from pdet_fetcher import (
-    fetch_caged,
-    fetch_caged_2020,
-    fetch_caged_2020_docs,
-    fetch_caged_docs,
-    fetch_rais,
-    fetch_rais_docs,
     list_caged,
     list_caged_2020,
+    list_caged_2020_docs,
+    list_caged_docs,
     list_rais,
+    list_rais_docs,
+)
+from pdet_fetcher.storage import (
+    get_caged_2020_docs_filepath,
+    get_caged_2020_filepath,
+    get_caged_docs_filepath,
+    get_caged_filepath,
+    get_rais_docs_filepath,
+    get_rais_filepath,
 )
 
-app = typer.Typer(help="Microdados do PDET (CAGED, RAIS).")
+from .fetch import FTP_HOST
 
 _DEFAULT_OUTPUT = Path("/data/pdet")
 console = get_console()
 
-# Datasets baixáveis e os fetchers (dados + docs) de cada um.
-_DATASET_FETCHERS = {
-    "rais": (fetch_rais, fetch_rais_docs),
-    "caged": (fetch_caged, fetch_caged_docs),
-    "caged-2020": (fetch_caged_2020, fetch_caged_2020_docs),
+GROUPS = {
+    "caged": {"name": "CAGED Histórico (até 2019)"},
+    "caged-2020": {"name": "Novo CAGED (a partir de 2020)"},
+    "rais": {"name": "RAIS (Vínculos e Estabelecimentos)"},
 }
+
+
+def pdet_list_datasets(group: str) -> list[dict[str, Any]]:
+    if group == "caged":
+        return list(list_caged()) + list(list_caged_docs())
+    elif group == "caged-2020":
+        return list(list_caged_2020()) + list(list_caged_2020_docs())
+    elif group == "rais":
+        return list(list_rais()) + list(list_rais_docs())
+    return []
+
+
+def pdet_path_builder(
+    output_dir: Path, entry: dict[str, Any], last_modified: dt.date | None
+) -> Path:
+    # A base is the target dir
+    dataset = entry.get("dataset")
+
+    # We figure out if it's docs or data based on the path.
+    # Actually, we can use the original storage functions.
+    is_doc = "/_documentacao/" in entry.get("url", "")
+
+    if dataset == "caged" or dataset == "caged-ajustes":
+        if is_doc:
+            return get_caged_docs_filepath(entry, output_dir)
+        return get_caged_filepath(entry, output_dir)
+    elif dataset == "caged-2020":
+        if is_doc:
+            return get_caged_2020_docs_filepath(entry, output_dir)
+        return get_caged_2020_filepath(entry, output_dir)
+    elif dataset in ("rais-estabelecimentos", "rais-vinculos"):
+        if is_doc:
+            return get_rais_docs_filepath(entry, output_dir)
+        return get_rais_filepath(entry, output_dir)
+
+    # fallback
+    return output_dir / (entry.get("id") or "unknown.bin")
+
+
+fetcher = FetcherApp(
+    name="pdet-fetcher",
+    help="Microdados do PDET (CAGED, RAIS).",
+    groups_dict=GROUPS,
+    aliases_dict={},
+    list_datasets=pdet_list_datasets,
+    path_builder=pdet_path_builder,
+    default_output=_DEFAULT_OUTPUT,
+    client=FtpClient(FTP_HOST),
+)
+
+app = fetcher.app
 
 # Datasets reconhecidos pelo extrator de colunas.
 _DATASETS = {
@@ -65,73 +122,6 @@ _DATASETS = {
         "encoding": "utf-8",
     },
 }
-
-
-def _run_sync(
-    targets: list[str], output: Path, show_progress: bool, workers: int = 4
-) -> None:
-    """Baixar os datasets selecionados via FTP."""
-    for dataset in targets:
-        data_fn, docs_fn = _DATASET_FETCHERS[dataset]
-        data_fn(dest_dir=output, show_progress=show_progress, workers=workers)
-        docs_fn(dest_dir=output, show_progress=show_progress, workers=workers)
-
-
-@app.command("sync")
-def cmd_sync(
-    datasets: Annotated[
-        list[str] | None,
-        typer.Argument(
-            help=("Datasets (rais, caged, caged-2020). Omitir para todos."),
-        ),
-    ] = None,
-    output: Annotated[
-        Path, typer.Option("-o", "--output", help="Diretório de destino")
-    ] = _DEFAULT_OUTPUT,
-    workers: Annotated[
-        int, typer.Option("--workers", help="Número de downloads paralelos")
-    ] = 4,
-    verbose: Annotated[bool, typer.Option("--verbose", help="Logs detalhados")] = False,
-) -> None:
-    """Sincronizar microdados do PDET via FTP."""
-    setup_rich_logging(verbose, console=console)
-    targets = datasets if datasets else list(_DATASET_FETCHERS.keys())
-    invalid = [d for d in targets if d not in _DATASET_FETCHERS]
-    if invalid:
-        console.print(
-            f"[red]Erro:[/red] dataset(s) desconhecido(s): {', '.join(invalid)}"
-        )
-        raise typer.Exit(1)
-
-    try:
-        _run_sync(targets, output, show_progress=not verbose, workers=workers)
-        console.print("[green]✓[/green] Sincronização concluída.")
-    except KeyboardInterrupt as err:
-        console.print("[yellow]Sincronização cancelada pelo usuário.[/yellow]")
-        raise typer.Exit(code=130) from err
-
-
-@app.command("list")
-def cmd_list(
-    output: Annotated[
-        Path, typer.Option("-o", "--output", help="Diretório de referência")
-    ] = _DEFAULT_OUTPUT,
-    verbose: Annotated[bool, typer.Option("--verbose", help="Logs detalhados")] = False,
-) -> None:
-    """Listar arquivos disponíveis no FTP."""
-    setup_rich_logging(verbose, console=console)
-    t = Table(show_header=True, header_style="bold")
-    t.add_column("Dataset", style="cyan")
-    t.add_column("Ano", justify="right")
-    t.add_column("Arquivo")
-    t.add_column("Destino")
-
-    for listing in (list_caged, list_caged_2020, list_rais):
-        for f in listing():
-            dest = output / f["dataset"] / str(f["year"]) / f["name"]
-            if not dest.exists():
-                t.add_row(f["dataset"], str(f["year"]), f["name"], str(dest))
-    console.print(t)
 
 
 @app.command("convert")
@@ -237,8 +227,8 @@ def cmd_pipeline(
 ) -> None:
     """Pipeline completo do PDET (sync → convert)."""
     setup_rich_logging(verbose, console=console)
-    targets = datasets if datasets else list(_DATASET_FETCHERS.keys())
-    invalid = [d for d in targets if d not in _DATASET_FETCHERS]
+    targets = datasets if datasets else list(GROUPS.keys())
+    invalid = [d for d in targets if d not in GROUPS]
     if invalid:
         console.print(
             f"[red]Erro:[/red] dataset(s) desconhecido(s): {', '.join(invalid)}"
@@ -248,7 +238,39 @@ def cmd_pipeline(
 
     try:
         console.print(Rule("[bold]Passo 1/2: Download[/bold]"))
-        _run_sync(targets, output, show_progress=not verbose, workers=workers)
+        import concurrent.futures
+
+        from quantilica.cli.ui import (
+            ProgressPool,
+            graceful_executor,
+            make_batch_progress,
+            make_download_progress,
+        )
+        from rich.console import Group
+        from rich.live import Live
+
+        entries = [e for g in targets for e in fetcher.list_datasets(g)]
+
+        overall = make_batch_progress(console)
+        file_prog = make_download_progress(console)
+        overall_task = overall.add_task("[cyan]Baixando...[/cyan]", total=len(entries))
+        pool = ProgressPool(workers=workers, file_prog=file_prog)
+
+        def _worker(entry):
+            eid = entry.get("id", "unknown")
+            with pool.acquire(description=f"[cyan]{eid}[/cyan]") as cb:
+                fetcher.download_entry(entry, output, progress=cb)
+                return True
+
+        with graceful_executor(max_workers=workers) as executor:
+            with Live(
+                Group(overall, file_prog), console=console, refresh_per_second=10
+            ):
+                futures = {executor.submit(_worker, entry): entry for entry in entries}
+                for future in concurrent.futures.as_completed(futures):
+                    overall.update(overall_task, advance=1)
+                    future.result()
+
         console.print("[green]✓[/green] Download concluído.")
 
         console.print(Rule("[bold]Passo 2/2: Conversão[/bold]"))
