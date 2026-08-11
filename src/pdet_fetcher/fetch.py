@@ -274,7 +274,7 @@ def _fetch_loop(
                     source_id="pdet",
                     dataset_id=file.get("dataset", "unknown"),
                     producer="pdet-fetcher",
-                    progress_callback=_chunk_cb,
+                    progress=_chunk_cb,
                 )
                 return file | {"filepath": downloaded_path}
         except Exception as e:
