@@ -26,6 +26,14 @@ logger = logging.getLogger(__name__)
 
 
 def parse_filename(f: Path) -> dict[str, str | int | None]:
+    """Parses a filename to extract metadata.
+
+    Args:
+        f (Path): The file path to parse.
+
+    Returns:
+        dict[str, str | int | None]: A dictionary containing the parsed metadata.
+    """
     m = re.search(r"^([a-z0-9-]+)_([a-z0-9-]+)@(\d{8})\.(7z|zip)$", f.name)
     dataset, partition, modification, extension = m.groups()
     date_uf = partition.split("-")
@@ -47,6 +55,14 @@ def parse_filename(f: Path) -> dict[str, str | int | None]:
 
 
 def convert_columns_dtypes(df: pl.DataFrame) -> pl.DataFrame:
+    """Converts the datatypes of columns in a DataFrame based on predefined constants.
+
+    Args:
+        df (pl.DataFrame): The input DataFrame.
+
+    Returns:
+        pl.DataFrame: A DataFrame with the converted datatypes.
+    """
     for column in df.columns:
         if column in INTEGER_COLUMNS:
             df = df.with_columns(
@@ -106,6 +122,20 @@ def _resolve_columns(schema_dict: dict[int, tuple], date_key: int) -> tuple:
 
 
 def read_rais(filepath: Path, year: int, dataset: str, **read_csv_args) -> pl.DataFrame:
+    """Reads a RAIS dataset from a CSV file into a Polars DataFrame.
+
+    Args:
+        filepath (Path): The path to the CSV file.
+        year (int): The year of the dataset.
+        dataset (str): The specific RAIS dataset to read ('vinculos' or 'estabelecimentos').
+        **read_csv_args: Additional keyword arguments for polars.read_csv.
+
+    Returns:
+        pl.DataFrame: The loaded and typed DataFrame.
+
+    Raises:
+        ValueError: If an unknown RAIS dataset is provided.
+    """
     if dataset == "vinculos":
         columns_names = _resolve_columns(RAIS_VINCULOS_COLUMNS, year)
     elif dataset == "estabelecimentos":
@@ -131,6 +161,20 @@ def read_rais(filepath: Path, year: int, dataset: str, **read_csv_args) -> pl.Da
 def read_caged(
     filepath: Path, date: int, dataset: str, **read_csv_args
 ) -> pl.DataFrame:
+    """Reads a CAGED dataset from a CSV file into a Polars DataFrame.
+
+    Args:
+        filepath (Path): The path to the CSV file.
+        date (int): The date (usually year-month format) of the dataset.
+        dataset (str): The specific CAGED dataset to read.
+        **read_csv_args: Additional keyword arguments for polars.read_csv.
+
+    Returns:
+        pl.DataFrame: The loaded and typed DataFrame.
+
+    Raises:
+        ValueError: If an unknown CAGED dataset is provided.
+    """
     if dataset == "caged":
         encoding = "latin-1"
         columns_names = _resolve_columns(CAGED_COLUMNS, date)
@@ -167,6 +211,15 @@ def read_caged(
 
 
 def write_parquet(df: pl.DataFrame, filepath: Path) -> Path:
+    """Writes a DataFrame to a Parquet file.
+
+    Args:
+        df (pl.DataFrame): The DataFrame to write.
+        filepath (Path): The destination file path.
+
+    Returns:
+        Path: The file path where the Parquet file was written.
+    """
     logger.info("Writing data to %s", filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)
     df.write_parquet(filepath)
@@ -174,6 +227,17 @@ def write_parquet(df: pl.DataFrame, filepath: Path) -> Path:
 
 
 def decompress(file_metadata: dict[str, Any]) -> dict[str, Path]:
+    """Decompresses an archive file using 7z.
+
+    Args:
+        file_metadata (dict[str, Any]): A dictionary containing metadata for the file, including 'filepath'.
+
+    Returns:
+        dict[str, Path]: The file metadata updated with paths to the temporary directory and decompressed file.
+
+    Raises:
+        RuntimeError: If 7z fails to decompress or produces no output files.
+    """
     compressed_filepath = file_metadata["filepath"]
     logger.info("Decompressing %s", compressed_filepath)
     tmp_dir = Path(tempfile.mkdtemp(prefix="pdet"))

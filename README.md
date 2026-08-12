@@ -4,6 +4,8 @@
 
 > Ferramenta para coletar, processar e analisar microdados de emprego e trabalho do Brasil diretamente da **PDET** (Plataforma de Disseminação de Estatísticas do Trabalho).
 
+**Para a documentação completa, consulte [https://docs.quantilica.com](https://docs.quantilica.com).**
+
 Acesse dados do **RAIS** e **CAGED** de forma programática, com conversão automática de tipos, tratamento de anomalias e exportação para formatos modernos como Parquet.
 
 ---

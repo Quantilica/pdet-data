@@ -29,6 +29,14 @@ _FTP_ERRORS = FTP_TRANSIENT_ERRORS + (AttributeError,)
 
 
 def connect(attempts: int = 3) -> ftplib.FTP:
+    """Connects to the PDET FTP server.
+
+    Args:
+        attempts (int, optional): Maximum number of connection attempts. Defaults to 3.
+
+    Returns:
+        ftplib.FTP: An active FTP connection to the server.
+    """
     return ftp_connect(
         FTP_HOST,
         encoding="latin-1",
@@ -41,7 +49,14 @@ def connect(attempts: int = 3) -> ftplib.FTP:
 
 
 def list_files(directory: str) -> list[dict]:
-    """List all files in the current directory using custom parser for MTPS server."""
+    """List all files in the current directory using custom parser for MTPS server.
+
+    Args:
+        directory (str): The FTP directory path to list.
+
+    Returns:
+        list[dict]: A list of dictionaries containing file metadata.
+    """
     if directory in _list_files_cache:
         return _list_files_cache[directory]
 
@@ -206,11 +221,21 @@ def _list_dataset_files(dataset: str) -> Generator[dict, None, None]:
 # ---------------------------------- CAGED ------------------------------------
 # -----------------------------------------------------------------------------
 def list_caged() -> Generator[dict, None, None]:
+    """Lists files for the classic CAGED datasets.
+
+    Yields:
+        dict: File metadata for CAGED files.
+    """
     for dataset in ("caged", "caged-ajustes"):
         yield from _list_dataset_files(dataset)
 
 
 def list_caged_docs() -> Generator[dict, None, None]:
+    """Lists documentation files for the classic CAGED datasets.
+
+    Yields:
+        dict: File metadata for CAGED documentation files.
+    """
     for file in list_files(docs["caged"]["dir_path"]):
         if not re.match(docs["caged"]["fn_pattern"], file["name"]):
             continue
@@ -232,11 +257,21 @@ def list_caged_docs() -> Generator[dict, None, None]:
 
 
 def list_caged_2020() -> Generator[dict, None, None]:
+    """Lists files for the Novo CAGED (2020+) datasets.
+
+    Yields:
+        dict: File metadata for Novo CAGED files.
+    """
     for dataset in ("caged-2020-exc", "caged-2020-for", "caged-2020-mov"):
         yield from _list_dataset_files(dataset)
 
 
 def list_caged_2020_docs() -> Generator[dict, None, None]:
+    """Lists documentation files for the Novo CAGED (2020+) datasets.
+
+    Yields:
+        dict: File metadata for Novo CAGED documentation files.
+    """
     for file in list_files(docs["caged-2020"]["dir_path"]):
         if not re.match(docs["caged-2020"]["fn_pattern"], file["name"]):
             continue
@@ -252,11 +287,21 @@ def list_caged_2020_docs() -> Generator[dict, None, None]:
 # ----------------------------------- RAIS ------------------------------------
 # -----------------------------------------------------------------------------
 def list_rais() -> Generator[dict, None, None]:
+    """Lists files for the RAIS datasets.
+
+    Yields:
+        dict: File metadata for RAIS files.
+    """
     for dataset in ("rais-estabelecimentos", "rais-vinculos"):
         yield from _list_dataset_files(dataset)
 
 
 def list_rais_docs() -> Generator[dict, None, None]:
+    """Lists documentation files for the RAIS datasets.
+
+    Yields:
+        dict: File metadata for RAIS documentation files.
+    """
     for file in list_files(docs["rais-vinculos"]["dir_path"]):
         yield file | {
             "dataset": "rais-vinculos",

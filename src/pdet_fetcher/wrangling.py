@@ -11,6 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 def convert_rais(data_dir: Path, dest_dir: Path) -> None:
+    """Converts RAIS raw files to Parquet format.
+
+    Args:
+        data_dir (Path): The directory containing raw RAIS files.
+        dest_dir (Path): The destination directory for Parquet files.
+    """
     for dataset in ("vinculos", "estabelecimentos"):
         dataset_name = f"rais-{dataset}"
         src_dir = data_dir / dataset_name
@@ -66,6 +72,12 @@ def convert_rais(data_dir: Path, dest_dir: Path) -> None:
 
 
 def convert_caged(data_dir: Path, dest_dir: Path) -> None:
+    """Converts CAGED raw files to Parquet format.
+
+    Args:
+        data_dir (Path): The directory containing raw CAGED files.
+        dest_dir (Path): The destination directory for Parquet files.
+    """
     logger.info("Converting CAGED data...")
 
     latest_files: dict[tuple, dict] = {}
@@ -123,6 +135,15 @@ def extract_columns_for_dataset(
     encoding: str = "latin-1",
     has_uf: bool = False,
 ) -> None:
+    """Extracts column names from a dataset and writes them to a CSV file.
+
+    Args:
+        data_dir (Path): The directory containing the dataset files.
+        glob_pattern (str): The glob pattern to match dataset files.
+        output_file (Path): The path to the output CSV file.
+        encoding (str, optional): The encoding of the input files. Defaults to "latin-1".
+        has_uf (bool, optional): Whether the dataset includes UF information. Defaults to False.
+    """
     fieldnames = ["column", "order", "name", "date"]
     if has_uf:
         fieldnames.append("uf")

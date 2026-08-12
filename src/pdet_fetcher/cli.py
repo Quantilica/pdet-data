@@ -81,6 +81,11 @@ def _run_sync(
 
 
 def handle_sync(args: argparse.Namespace) -> None:
+    """Handles the 'sync' CLI command.
+
+    Args:
+        args (argparse.Namespace): The parsed CLI arguments.
+    """
     targets = _resolve_targets(args.datasets)
     _run_sync(
         targets, args.output, show_progress=not args.verbose, workers=args.workers
@@ -88,6 +93,11 @@ def handle_sync(args: argparse.Namespace) -> None:
 
 
 def handle_list(args: argparse.Namespace) -> None:
+    """Handles the 'list' CLI command.
+
+    Args:
+        args (argparse.Namespace): The parsed CLI arguments.
+    """
     ftp = connect()
     try:
         for listing in (list_caged, list_caged_2020, list_rais):
@@ -100,11 +110,21 @@ def handle_list(args: argparse.Namespace) -> None:
 
 
 def handle_convert(args: argparse.Namespace) -> None:
+    """Handles the 'convert' CLI command.
+
+    Args:
+        args (argparse.Namespace): The parsed CLI arguments.
+    """
     convert_rais(args.input, args.output)
     convert_caged(args.input, args.output)
 
 
 def handle_columns(args: argparse.Namespace) -> None:
+    """Handles the 'columns' CLI command.
+
+    Args:
+        args (argparse.Namespace): The parsed CLI arguments.
+    """
     if args.dataset not in _DATASETS:
         raise SystemExit(f"Erro: dataset desconhecido: {args.dataset}")
     cfg = _DATASETS[args.dataset]
@@ -119,6 +139,11 @@ def handle_columns(args: argparse.Namespace) -> None:
 
 
 def handle_pipeline(args: argparse.Namespace) -> None:
+    """Handles the 'pipeline' CLI command.
+
+    Args:
+        args (argparse.Namespace): The parsed CLI arguments.
+    """
     targets = _resolve_targets(args.datasets)
     parquet_out = args.parquet_dir or args.output
     _run_sync(
@@ -129,6 +154,11 @@ def handle_pipeline(args: argparse.Namespace) -> None:
 
 
 def get_parser() -> argparse.ArgumentParser:
+    """Creates and configures the argument parser.
+
+    Returns:
+        argparse.ArgumentParser: The configured argument parser.
+    """
     parser = argparse.ArgumentParser(
         prog="pdet-fetcher",
         description="Microdados do PDET (CAGED, RAIS).",
@@ -259,6 +289,11 @@ def get_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Entry point for the CLI application.
+
+    Args:
+        argv (list[str] | None, optional): The command-line arguments. Defaults to None.
+    """
     parser = get_parser()
     args = parser.parse_args(argv)
     configure_cli_logging(verbose=args.verbose)

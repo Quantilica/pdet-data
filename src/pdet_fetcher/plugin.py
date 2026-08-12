@@ -45,6 +45,14 @@ GROUPS = {
 
 
 def pdet_list_datasets(group: str) -> list[dict[str, Any]]:
+    """Lists datasets for a given group.
+
+    Args:
+        group (str): The name of the dataset group.
+
+    Returns:
+        list[dict[str, Any]]: A list of dictionaries with dataset information.
+    """
     if group == "caged":
         return list(list_caged()) + list(list_caged_docs())
     elif group == "caged-2020":
@@ -57,6 +65,16 @@ def pdet_list_datasets(group: str) -> list[dict[str, Any]]:
 def pdet_path_builder(
     output_dir: Path, entry: dict[str, Any], last_modified: dt.date | None
 ) -> Path:
+    """Builds the file path for a dataset entry.
+
+    Args:
+        output_dir (Path): The base output directory.
+        entry (dict[str, Any]): The dataset entry metadata.
+        last_modified (dt.date | None): The last modified date of the entry.
+
+    Returns:
+        Path: The constructed file path.
+    """
     # A base is the target dir
     dataset = entry.get("dataset")
 
@@ -136,7 +154,16 @@ def cmd_convert(
     ] = _DEFAULT_OUTPUT,
     verbose: Annotated[bool, typer.Option("--verbose", help="Logs detalhados")] = False,
 ) -> None:
-    """Converter arquivos brutos para Parquet."""
+    """Converter arquivos brutos para Parquet.
+
+    Args:
+        input (Path): Diretório de origem com arquivos brutos.
+        output (Path, optional): Diretório de destino para Parquet. Defaults to _DEFAULT_OUTPUT.
+        verbose (bool, optional): Exibir logs detalhados. Defaults to False.
+
+    Raises:
+        typer.Exit: If required dependencies are missing.
+    """
     setup_rich_logging(verbose, console=console)
     try:
         from pdet_fetcher import convert_caged, convert_rais
@@ -171,7 +198,17 @@ def cmd_columns(
     ] = Path("."),
     verbose: Annotated[bool, typer.Option("--verbose", help="Logs detalhados")] = False,
 ) -> None:
-    """Extrair nomes de colunas dos arquivos brutos."""
+    """Extrair nomes de colunas dos arquivos brutos.
+
+    Args:
+        dataset (str): The name of the dataset.
+        input (Path): Diretório de origem com arquivos brutos.
+        output (Path, optional): Diretório para CSV de colunas. Defaults to current directory.
+        verbose (bool, optional): Exibir logs detalhados. Defaults to False.
+
+    Raises:
+        typer.Exit: If the dataset is unknown or required dependencies are missing.
+    """
     setup_rich_logging(verbose, console=console)
     if dataset not in _DATASETS:
         console.print(f"[red]Dataset desconhecido:[/red] {dataset}")
@@ -225,7 +262,18 @@ def cmd_pipeline(
     ] = 4,
     verbose: Annotated[bool, typer.Option("--verbose", help="Logs detalhados")] = False,
 ) -> None:
-    """Pipeline completo do PDET (sync → convert)."""
+    """Pipeline completo do PDET (sync → convert).
+
+    Args:
+        datasets (list[str] | None, optional): Datasets to process. Defaults to None.
+        output (Path, optional): Diretório de dados brutos. Defaults to _DEFAULT_OUTPUT.
+        parquet_dir (Path | None, optional): Diretório para os Parquet. Defaults to None.
+        workers (int, optional): Número de downloads paralelos. Defaults to 4.
+        verbose (bool, optional): Exibir logs detalhados. Defaults to False.
+
+    Raises:
+        typer.Exit: If a dataset is unknown, dependencies are missing, or user cancels.
+    """
     setup_rich_logging(verbose, console=console)
     targets = datasets if datasets else list(GROUPS.keys())
     invalid = [d for d in targets if d not in GROUPS]
