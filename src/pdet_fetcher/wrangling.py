@@ -141,8 +141,10 @@ def extract_columns_for_dataset(
         data_dir (Path): The directory containing the dataset files.
         glob_pattern (str): The glob pattern to match dataset files.
         output_file (Path): The path to the output CSV file.
-        encoding (str, optional): The encoding of the input files. Defaults to "latin-1".
-        has_uf (bool, optional): Whether the dataset includes UF information. Defaults to False.
+        encoding (str, optional): The encoding of the input files.
+            Defaults to "latin-1".
+        has_uf (bool, optional): Whether the dataset includes UF
+            information. Defaults to False.
     """
     fieldnames = ["column", "order", "name", "date"]
     if has_uf:

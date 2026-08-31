@@ -127,7 +127,8 @@ def read_rais(filepath: Path, year: int, dataset: str, **read_csv_args) -> pl.Da
     Args:
         filepath (Path): The path to the CSV file.
         year (int): The year of the dataset.
-        dataset (str): The specific RAIS dataset to read ('vinculos' or 'estabelecimentos').
+        dataset (str): The specific RAIS dataset to read ('vinculos' or
+            'estabelecimentos').
         **read_csv_args: Additional keyword arguments for polars.read_csv.
 
     Returns:
@@ -230,10 +231,12 @@ def decompress(file_metadata: dict[str, Any]) -> dict[str, Path]:
     """Decompresses an archive file using 7z.
 
     Args:
-        file_metadata (dict[str, Any]): A dictionary containing metadata for the file, including 'filepath'.
+        file_metadata (dict[str, Any]): A dictionary containing metadata
+            for the file, including 'filepath'.
 
     Returns:
-        dict[str, Path]: The file metadata updated with paths to the temporary directory and decompressed file.
+        dict[str, Path]: The file metadata updated with paths to the
+            temporary directory and decompressed file.
 
     Raises:
         RuntimeError: If 7z fails to decompress or produces no output files.

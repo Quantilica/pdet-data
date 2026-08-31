@@ -158,7 +158,8 @@ def cmd_convert(
 
     Args:
         input (Path): Diretório de origem com arquivos brutos.
-        output (Path, optional): Diretório de destino para Parquet. Defaults to _DEFAULT_OUTPUT.
+        output (Path, optional): Diretório de destino para Parquet.
+            Defaults to _DEFAULT_OUTPUT.
         verbose (bool, optional): Exibir logs detalhados. Defaults to False.
 
     Raises:
@@ -203,7 +204,8 @@ def cmd_columns(
     Args:
         dataset (str): The name of the dataset.
         input (Path): Diretório de origem com arquivos brutos.
-        output (Path, optional): Diretório para CSV de colunas. Defaults to current directory.
+        output (Path, optional): Diretório para CSV de colunas. Defaults to
+            current directory.
         verbose (bool, optional): Exibir logs detalhados. Defaults to False.
 
     Raises:
@@ -265,10 +267,14 @@ def cmd_pipeline(
     """Pipeline completo do PDET (sync → convert).
 
     Args:
-        datasets (list[str] | None, optional): Datasets to process. Defaults to None.
-        output (Path, optional): Diretório de dados brutos. Defaults to _DEFAULT_OUTPUT.
-        parquet_dir (Path | None, optional): Diretório para os Parquet. Defaults to None.
-        workers (int, optional): Número de downloads paralelos. Defaults to 4.
+        datasets (list[str] | None, optional): Datasets to process.
+            Defaults to None.
+        output (Path, optional): Diretório de dados brutos. Defaults to
+            _DEFAULT_OUTPUT.
+        parquet_dir (Path | None, optional): Diretório para os Parquet.
+            Defaults to None.
+        workers (int, optional): Número de downloads paralelos. Defaults
+            to 4.
         verbose (bool, optional): Exibir logs detalhados. Defaults to False.
 
     Raises:
